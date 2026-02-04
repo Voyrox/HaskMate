@@ -1,7 +1,7 @@
 # HaskMate: Your Haskell Development Companion
 
 ![HaskMate Preview](./Images/img.png)
-[![Haskmate Video](./Images/intro.gif)](https://github.com/Frost-Lord/HaskMate/blob/main/Images/intro.gif)
+[![Haskmate Video](./Images/intro.gif)](https://github.com/Voyrox/HaskMate/blob/main/Images/intro.gif)
 
 HaskMate is a Haskell-based project monitoring and automation tool, designed to aid Haskell developers in streamlining their workflow. It continuously watches for changes in your Haskell source files and automatically triggers a rebuild and re-execution of the project whenever a modification is detected.
 

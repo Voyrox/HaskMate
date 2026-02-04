@@ -2,10 +2,10 @@ cabal-version:      3.0
 name:               test
 version:            0.1.0.0
 synopsis:            Haskell File Monitor test script
-homepage:            https://github.com/Frost-Lord/HaskMate
+homepage:            https://github.com/Voyrox/HaskMate
 
 author:             Frost Lord
-maintainer:         51778028+Frost-Lord@users.noreply.github.com
+maintainer:         51778028+Voyrox@users.noreply.github.com
 
 category:           System
 build-type:         Simple

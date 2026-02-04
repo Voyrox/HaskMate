@@ -39,7 +39,7 @@ displayHelpData = do
 displayVersionData :: IO ()
 displayVersionData = do
   putStrLn $ yellow ++ "Checking for updates..."
-  initialRequest <- parseRequest "https://api.github.com/repos/Frost-Lord/HaskMate/releases/latest"
+  initialRequest <- parseRequest "https://api.github.com/repos/Voyrox/HaskMate/releases/latest"
 
   let request = setRequestHeader hUserAgent ["HaskMate"] initialRequest
 
@@ -99,5 +99,5 @@ displayCreditsData :: IO ()
 displayCreditsData = do
   putStrLn $ yellow ++ "Credits:"
   putStrLn $ green ++ "Developed by: Frost Lord | Ewen MacCulloch"
-  putStrLn $ green ++ "GitHub: Frost-Lord"
+  putStrLn $ green ++ "GitHub: Voyrox"
   putStrLn $ white
