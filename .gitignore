@@ -28,5 +28,5 @@ code.txt
 test/stack.yaml.lock
 test/app/test.exe
 
-re-write/zig-cache/
+re-write/.zig-cache/
 re-write/zig-out/
