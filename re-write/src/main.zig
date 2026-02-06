@@ -35,56 +35,107 @@ fn spawnShell(alloc: std.mem.Allocator, cmd: []const u8) !std.process.Child {
     return child;
 }
 
+fn waitAndReport(child: *std.process.Child) !void {
+    const term = try child.wait();
+    switch (term) {
+        .Exited => |code| {
+            if (code != 0) try outPrint("{s}{s}{s} Process exited with code {d}\n", .{
+                Colors.red, projectName, Colors.white, code,
+            });
+        },
+        else => {},
+    }
+}
+
+fn exePathFromHs(alloc: std.mem.Allocator, hs_path: []const u8) ![]u8 {
+    if (hs_path.len >= 3 and std.mem.eql(u8, hs_path[hs_path.len - 3 ..], ".hs")) {
+        return try alloc.dupe(u8, hs_path[0 .. hs_path.len - 3]);
+    }
+    return try alloc.dupe(u8, hs_path);
+}
+
 fn runScriptOrCmd(
     alloc: std.mem.Allocator,
     maybe_settings: ?*const settings_mod.Settings,
     fullPath: []const u8,
-) !std.process.Child {
+) !void {
     const rootPath = std.fs.path.dirname(fullPath) orelse ".";
+    const exe_path = try exePathFromHs(alloc, fullPath);
+    defer alloc.free(exe_path);
 
     if (maybe_settings) |s| {
         if (s.cmd.len != 0) {
-            return try spawnShell(alloc, s.cmd);
+            var c = try spawnShell(alloc, s.cmd);
+            try waitAndReport(&c);
+            return;
         }
 
-        if (std.mem.eql(u8, s.script, "ghc")) {
-            const cmd = try std.fmt.allocPrint(alloc, "stack ghc -- {s}", .{fullPath});
+        if (std.mem.eql(u8, s.script, "runghc") or std.mem.eql(u8, s.script, "runhaskell")) {
+            const cmd = try std.fmt.allocPrint(alloc, "{s} {s}", .{ s.script, fullPath });
             defer alloc.free(cmd);
-            return try spawnShell(alloc, cmd);
-        } else if (std.mem.eql(u8, s.script, "stack")) {
-            const cmd = try std.fmt.allocPrint(alloc, "stack build && stack run {s}", .{rootPath});
-            defer alloc.free(cmd);
-            return try spawnShell(alloc, cmd);
-        } else if (std.mem.eql(u8, s.script, "cabal")) {
-            const cmd = try std.fmt.allocPrint(alloc, "cabal build && cabal run {s}", .{rootPath});
-            defer alloc.free(cmd);
-            return try spawnShell(alloc, cmd);
-        } else if (s.script.len != 0) {
-            return try spawnShell(alloc, s.script);
+            var c = try spawnShell(alloc, cmd);
+            try waitAndReport(&c);
+            return;
+        }
+
+        if (std.mem.eql(u8, s.script, "ghc") or std.mem.eql(u8, s.script, "stack") or std.mem.eql(u8, s.script, "cabal")) {
+            if (std.mem.eql(u8, s.script, "cabal")) {
+                const cmd = try std.fmt.allocPrint(alloc, "cd {s} && cabal build && cabal run", .{rootPath});
+                defer alloc.free(cmd);
+                var c = try spawnShell(alloc, cmd);
+                try waitAndReport(&c);
+                return;
+            }
+
+            if (std.mem.eql(u8, s.script, "stack")) {
+                const build_cmd = try std.fmt.allocPrint(alloc, "stack ghc -- {s}", .{fullPath});
+                defer alloc.free(build_cmd);
+                var c1 = try spawnShell(alloc, build_cmd);
+                try waitAndReport(&c1);
+
+                const run_cmd = try std.fmt.allocPrint(alloc, "{s}", .{exe_path});
+                defer alloc.free(run_cmd);
+                var c2 = try spawnShell(alloc, run_cmd);
+                try waitAndReport(&c2);
+                return;
+            }
+
+            const build_cmd = try std.fmt.allocPrint(alloc, "ghc {s}", .{fullPath});
+            defer alloc.free(build_cmd);
+            var c1 = try spawnShell(alloc, build_cmd);
+            try waitAndReport(&c1);
+
+            const run_cmd = try std.fmt.allocPrint(alloc, "{s}", .{exe_path});
+            defer alloc.free(run_cmd);
+            var c2 = try spawnShell(alloc, run_cmd);
+            try waitAndReport(&c2);
+            return;
+        }
+
+        if (s.script.len != 0) {
+            var c = try spawnShell(alloc, s.script);
+            try waitAndReport(&c);
+            return;
         }
     }
 
-    const cmd = try std.fmt.allocPrint(alloc, "stack ghc -- {s}", .{fullPath});
-    defer alloc.free(cmd);
-    return try spawnShell(alloc, cmd);
-}
+    const build_cmd = try std.fmt.allocPrint(alloc, "stack ghc -- {s}", .{fullPath});
+    defer alloc.free(build_cmd);
+    var c1 = try spawnShell(alloc, build_cmd);
+    try waitAndReport(&c1);
 
-fn killChild(child: *std.process.Child) void {
-    _ = child.kill() catch {};
-    _ = child.wait() catch {};
+    var c2 = try spawnShell(alloc, exe_path);
+    try waitAndReport(&c2);
 }
 
 fn monitorScript(
     alloc: std.mem.Allocator,
     delay_us: u64,
     fullPath: []const u8,
-    initial_mtime: i128,
     maybe_settings: ?*const settings_mod.Settings,
-    child_opt: *?std.process.Child,
 ) !void {
-    _ = alloc;
-
-    var last = initial_mtime;
+    try runScriptOrCmd(alloc, maybe_settings, fullPath);
+    var last = try getLastModifiedNs(fullPath);
 
     while (true) {
         std.Thread.sleep(delay_us * std.time.ns_per_us);
@@ -95,15 +146,9 @@ fn monitorScript(
                 Colors.yellow, projectName, Colors.white,
             });
 
-            if (child_opt.*) |*child| {
-                killChild(child);
-                child_opt.* = null;
-            }
+            try runScriptOrCmd(alloc, maybe_settings, fullPath);
 
-            const new_child = try runScriptOrCmd(std.heap.page_allocator, maybe_settings, fullPath);
-            child_opt.* = new_child;
-
-            last = current;
+            last = try getLastModifiedNs(fullPath);
         }
     }
 }
@@ -189,12 +234,5 @@ pub fn main() !void {
         Colors.green, projectName, Colors.white, Colors.red, Colors.white,
     });
 
-    var child: ?std.process.Child = null;
-    defer if (child) |*c| killChild(c);
-
-    const spawned = try runScriptOrCmd(alloc, loaded_ptr, fullPath);
-    child = spawned;
-
-    const lastModified = try getLastModifiedNs(fullPath);
-    try monitorScript(alloc, delay_us, fullPath, lastModified, loaded_ptr, &child);
+    try monitorScript(alloc, delay_us, fullPath, loaded_ptr);
 }

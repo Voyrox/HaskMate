@@ -1,6 +1,6 @@
 {
-    "delay": 1000000,
-    "ignore": [],
-    "script": "stack",
-    "cmd": ""
+  "delay": 1000000,
+  "ignore": [],
+  "script": "runghc",
+  "cmd": ""
 }
