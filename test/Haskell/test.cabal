@@ -4,7 +4,7 @@ version:            0.1.0.0
 synopsis:            Haskell File Monitor test script
 homepage:            https://github.com/Voyrox/HaskMate
 
-author:             Frost Lord
+author:             Voyrox
 maintainer:         51778028+Voyrox@users.noreply.github.com
 
 category:           System

@@ -61,7 +61,6 @@ fn replaceAllAlloc(
             i += needle.len - 1;
         }
     }
-
     if (count == 0) return try alloc.dupe(u8, input);
 
     const new_len = input.len + count * (replacement.len - needle.len);
@@ -93,13 +92,7 @@ fn expandPlaceholders(
 ) ![]u8 {
     const step1 = try replaceAllAlloc(alloc, cmd, "{file}", file_path);
     defer alloc.free(step1);
-    const step2 = try replaceAllAlloc(alloc, step1, "{dir}", dir_path);
-    return step2;
-}
-
-fn effectiveCommandFromSettings(s: *const settings_mod.Settings) []const u8 {
-    if (s.cmd.len != 0) return s.cmd;
-    return s.script;
+    return try replaceAllAlloc(alloc, step1, "{dir}", dir_path);
 }
 
 fn runConfiguredCommand(
@@ -108,32 +101,31 @@ fn runConfiguredCommand(
     fullPath: []const u8,
 ) !void {
     if (maybe_settings == null) {
-        try outWriteAll("No HaskMate.json found.\nCreate one with:\n" ++
-            "{\n" ++
-            "  \"delay\": 1000000,\n" ++
-            "  \"ignore\": [],\n" ++
-            "  \"cmd\": \"<your command here>\",\n" ++
-            "  \"script\": \"\"\n" ++
-            "}\n" ++
-            "Example (Haskell): \"cmd\": \"stack ghc -- {file} && {dir}/test\"\n" ++
-            "Example (Node):    \"cmd\": \"cd {dir} && bun run dev\"\n");
+        try outWriteAll(
+            "No HaskMate.json found.\n" ++
+                "Create one with:\n" ++
+                "{\n" ++
+                "  \"delay\": 1000000,\n" ++
+                "  \"ignore\": [],\n" ++
+                "  \"cmd\": \"<your command here>\"\n" ++
+                "}\n" ++
+                "Placeholders: {file} (absolute path), {dir} (directory)\n",
+        );
         return;
     }
 
     const s = maybe_settings.?;
-    const raw = effectiveCommandFromSettings(s);
-
-    if (raw.len == 0) {
+    if (s.cmd.len == 0) {
         try outWriteAll(
-            "HaskMate.json loaded but both \"cmd\" and \"script\" are empty.\n" ++
-                "Set one of them to the command you want to run.\n" ++
+            "HaskMate.json loaded but \"cmd\" is empty.\n" ++
+                "Set \"cmd\" to what you want to run.\n" ++
                 "You can use {file} and {dir} placeholders.\n",
         );
         return;
     }
 
     const dir_path = std.fs.path.dirname(fullPath) orelse ".";
-    const expanded = try expandPlaceholders(alloc, raw, fullPath, dir_path);
+    const expanded = try expandPlaceholders(alloc, s.cmd, fullPath, dir_path);
     defer alloc.free(expanded);
 
     try outPrint("{s}{s}{s} Running: {s}\n", .{
@@ -163,7 +155,6 @@ fn monitorScript(
             });
 
             try runConfiguredCommand(alloc, maybe_settings, fullPath);
-
             last = try getLastModifiedNs(fullPath);
         }
     }

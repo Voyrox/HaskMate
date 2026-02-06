@@ -1,20 +1,14 @@
 const std = @import("std");
 
-fn wprint(writer: anytype, comptime fmt: []const u8, args: anytype) !void {
-    try std.fmt.format(writer, fmt, args);
-}
-
 pub const Settings = struct {
     ignore: [][]const u8,
     delay: ?u64,
-    script: []const u8,
     cmd: []const u8,
 };
 
 const SettingsJson = struct {
     ignore: ?[]const []const u8 = null,
     delay: ?u64 = null,
-    script: ?[]const u8 = null,
     cmd: ?[]const u8 = null,
 };
 
@@ -40,7 +34,6 @@ pub fn loadSettings(alloc: std.mem.Allocator, path: []const u8) !?Settings {
 
     const ignore_list = pj.ignore orelse &[_][]const u8{};
     const delay_val: ?u64 = pj.delay; // microseconds
-    const script_val = pj.script orelse "";
     const cmd_val = pj.cmd orelse "";
 
     var ignore_out = try alloc.alloc([]const u8, ignore_list.len);
@@ -49,7 +42,6 @@ pub fn loadSettings(alloc: std.mem.Allocator, path: []const u8) !?Settings {
     return Settings{
         .ignore = ignore_out,
         .delay = delay_val,
-        .script = try alloc.dupe(u8, script_val),
         .cmd = try alloc.dupe(u8, cmd_val),
     };
 }
@@ -57,6 +49,5 @@ pub fn loadSettings(alloc: std.mem.Allocator, path: []const u8) !?Settings {
 pub fn freeSettings(alloc: std.mem.Allocator, s: *Settings) void {
     for (s.ignore) |it| alloc.free(it);
     alloc.free(s.ignore);
-    alloc.free(s.script);
     alloc.free(s.cmd);
 }

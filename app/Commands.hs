@@ -98,6 +98,6 @@ displayClearData = do
 displayCreditsData :: IO ()
 displayCreditsData = do
   putStrLn $ yellow ++ "Credits:"
-  putStrLn $ green ++ "Developed by: Frost Lord | Ewen MacCulloch"
+  putStrLn $ green ++ "Developed by: Voyrox | Ewen MacCulloch"
   putStrLn $ green ++ "GitHub: Voyrox"
   putStrLn $ white

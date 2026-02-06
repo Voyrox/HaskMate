@@ -76,7 +76,7 @@ pub fn displayClearData() !void {
 
 pub fn displayCreditsData() !void {
     try spr("{s}Credits:\n", .{Colors.yellow});
-    try spr("{s}Developed by: Frost Lord | Ewen MacCulloch\n", .{Colors.green});
+    try spr("{s}Developed by: Voyrox | Ewen MacCulloch\n", .{Colors.green});
     try spr("{s}GitHub: Voyrox\n", .{Colors.green});
     try spr("{s}\n", .{Colors.white});
 }

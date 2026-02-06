@@ -5,7 +5,7 @@ synopsis:           Haskell File Monitor
 homepage:           https://github.com/Voyrox/HaskMate
 license:            MIT
 license-file:       LICENSE
-author:             Frost Lord
+author:             Voyrox
 maintainer:         51778028+Voyrox@users.noreply.github.com
 category:           System
 build-type:         Simple
