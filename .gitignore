@@ -30,3 +30,10 @@ test/app/test.exe
 
 re-write/.zig-cache/
 re-write/zig-out/
+test/Haskell/app/test.exe
+test/Haskell/app/test.hi
+test/Haskell/app/test.o
+test/Haskell/app/test
+
+test/NodeJS/node_modules/
+test/NodeJS/package-lock.json

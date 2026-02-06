@@ -1,0 +1,5 @@
+{
+  "delay": 500000,
+  "ignore": [],
+  "cmd": "node app.js -- {file} && {dir}"
+}

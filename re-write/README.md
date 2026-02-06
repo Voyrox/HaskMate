@@ -5,18 +5,19 @@ Zippy is a lightweight Zig-built CLI that watches a single Haskell source file a
 ## Quick start
 
 ```bash
-# from the re-write/ directory
-zig build
+# Run from source (Linux/Arch):
+make build
 zig build run -- path/to/Main.hs
 
-# or install locally
-zig build install
-zippy path/to/Main.hs
+# Install it globally
+make install          # (Recommended) /usr/local on Linux | %LOCALAPPDATA%/Programs/zippy on Windows
+make install PREFIX=$HOME/.local   # user-local
+zippy ./Main.hs
 ```
 
-## Configuration (optional)
+## Configuration
 
-Zippy loads `Zippy.json` from the current working directory if it exists:
+Zippy loads `Zippy.json` from the current working directory:
 
 ```json
 {
@@ -60,16 +61,19 @@ Generate a starter config: `zippy --generate`.
 - Placeholder expansion `{file}` and `{dir}` in commands
 - Zero runtime deps beyond Zig + your Haskell toolchain
 
-## Install from source
+## Build & install
 
-Prereqs: Zig 0.15.2+, Haskell toolchain (stack/ghc/cabal).
+Prereqs: Zig 0.15.2+
 
-```bash
-cd Zippy
-zig build install
-```
+- Linux/Arch (native):
+  - `make build`
+  - `make install` (defaults to `/usr/local`; override with `PREFIX=/path`)
+- Windows cross (from Linux host):
+  - `make build-windows`
+  - `make install PREFIX="$LOCALAPPDATA/Programs/zippy"`
+- Add `$(PREFIX)/bin` to your `PATH` if it isn’t already.
 
-Run locally after build:
+Run after install:
 
 ```bash
 zippy app/Main.hs
