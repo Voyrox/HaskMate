@@ -39,7 +39,7 @@ fn waitAndReport(child: *std.process.Child) !void {
     const term = try child.wait();
     switch (term) {
         .Exited => |code| {
-            if (code != 0) try outPrint("{s}{s}{s} Process exited with code {d}\n", .{
+            if (code != 0) try outPrint("{s}{s}{s} Command exited with code {d}\n", .{
                 Colors.red, projectName, Colors.white, code,
             });
         },
@@ -47,85 +47,101 @@ fn waitAndReport(child: *std.process.Child) !void {
     }
 }
 
-fn exePathFromHs(alloc: std.mem.Allocator, hs_path: []const u8) ![]u8 {
-    if (hs_path.len >= 3 and std.mem.eql(u8, hs_path[hs_path.len - 3 ..], ".hs")) {
-        return try alloc.dupe(u8, hs_path[0 .. hs_path.len - 3]);
+fn replaceAllAlloc(
+    alloc: std.mem.Allocator,
+    input: []const u8,
+    needle: []const u8,
+    replacement: []const u8,
+) ![]u8 {
+    var count: usize = 0;
+    var i: usize = 0;
+    while (i + needle.len <= input.len) : (i += 1) {
+        if (std.mem.eql(u8, input[i .. i + needle.len], needle)) {
+            count += 1;
+            i += needle.len - 1;
+        }
     }
-    return try alloc.dupe(u8, hs_path);
+
+    if (count == 0) return try alloc.dupe(u8, input);
+
+    const new_len = input.len + count * (replacement.len - needle.len);
+    var out = try alloc.alloc(u8, new_len);
+
+    var in_idx: usize = 0;
+    var out_idx: usize = 0;
+
+    while (in_idx < input.len) {
+        if (in_idx + needle.len <= input.len and std.mem.eql(u8, input[in_idx .. in_idx + needle.len], needle)) {
+            std.mem.copyForwards(u8, out[out_idx .. out_idx + replacement.len], replacement);
+            out_idx += replacement.len;
+            in_idx += needle.len;
+        } else {
+            out[out_idx] = input[in_idx];
+            out_idx += 1;
+            in_idx += 1;
+        }
+    }
+
+    return out;
 }
 
-fn runScriptOrCmd(
+fn expandPlaceholders(
+    alloc: std.mem.Allocator,
+    cmd: []const u8,
+    file_path: []const u8,
+    dir_path: []const u8,
+) ![]u8 {
+    const step1 = try replaceAllAlloc(alloc, cmd, "{file}", file_path);
+    defer alloc.free(step1);
+    const step2 = try replaceAllAlloc(alloc, step1, "{dir}", dir_path);
+    return step2;
+}
+
+fn effectiveCommandFromSettings(s: *const settings_mod.Settings) []const u8 {
+    if (s.cmd.len != 0) return s.cmd;
+    return s.script;
+}
+
+fn runConfiguredCommand(
     alloc: std.mem.Allocator,
     maybe_settings: ?*const settings_mod.Settings,
     fullPath: []const u8,
 ) !void {
-    const rootPath = std.fs.path.dirname(fullPath) orelse ".";
-    const exe_path = try exePathFromHs(alloc, fullPath);
-    defer alloc.free(exe_path);
-
-    if (maybe_settings) |s| {
-        if (s.cmd.len != 0) {
-            var c = try spawnShell(alloc, s.cmd);
-            try waitAndReport(&c);
-            return;
-        }
-
-        if (std.mem.eql(u8, s.script, "runghc") or std.mem.eql(u8, s.script, "runhaskell")) {
-            const cmd = try std.fmt.allocPrint(alloc, "{s} {s}", .{ s.script, fullPath });
-            defer alloc.free(cmd);
-            var c = try spawnShell(alloc, cmd);
-            try waitAndReport(&c);
-            return;
-        }
-
-        if (std.mem.eql(u8, s.script, "ghc") or std.mem.eql(u8, s.script, "stack") or std.mem.eql(u8, s.script, "cabal")) {
-            if (std.mem.eql(u8, s.script, "cabal")) {
-                const cmd = try std.fmt.allocPrint(alloc, "cd {s} && cabal build && cabal run", .{rootPath});
-                defer alloc.free(cmd);
-                var c = try spawnShell(alloc, cmd);
-                try waitAndReport(&c);
-                return;
-            }
-
-            if (std.mem.eql(u8, s.script, "stack")) {
-                const build_cmd = try std.fmt.allocPrint(alloc, "stack ghc -- {s}", .{fullPath});
-                defer alloc.free(build_cmd);
-                var c1 = try spawnShell(alloc, build_cmd);
-                try waitAndReport(&c1);
-
-                const run_cmd = try std.fmt.allocPrint(alloc, "{s}", .{exe_path});
-                defer alloc.free(run_cmd);
-                var c2 = try spawnShell(alloc, run_cmd);
-                try waitAndReport(&c2);
-                return;
-            }
-
-            const build_cmd = try std.fmt.allocPrint(alloc, "ghc {s}", .{fullPath});
-            defer alloc.free(build_cmd);
-            var c1 = try spawnShell(alloc, build_cmd);
-            try waitAndReport(&c1);
-
-            const run_cmd = try std.fmt.allocPrint(alloc, "{s}", .{exe_path});
-            defer alloc.free(run_cmd);
-            var c2 = try spawnShell(alloc, run_cmd);
-            try waitAndReport(&c2);
-            return;
-        }
-
-        if (s.script.len != 0) {
-            var c = try spawnShell(alloc, s.script);
-            try waitAndReport(&c);
-            return;
-        }
+    if (maybe_settings == null) {
+        try outWriteAll("No HaskMate.json found.\nCreate one with:\n" ++
+            "{\n" ++
+            "  \"delay\": 1000000,\n" ++
+            "  \"ignore\": [],\n" ++
+            "  \"cmd\": \"<your command here>\",\n" ++
+            "  \"script\": \"\"\n" ++
+            "}\n" ++
+            "Example (Haskell): \"cmd\": \"stack ghc -- {file} && {dir}/test\"\n" ++
+            "Example (Node):    \"cmd\": \"cd {dir} && bun run dev\"\n");
+        return;
     }
 
-    const build_cmd = try std.fmt.allocPrint(alloc, "stack ghc -- {s}", .{fullPath});
-    defer alloc.free(build_cmd);
-    var c1 = try spawnShell(alloc, build_cmd);
-    try waitAndReport(&c1);
+    const s = maybe_settings.?;
+    const raw = effectiveCommandFromSettings(s);
 
-    var c2 = try spawnShell(alloc, exe_path);
-    try waitAndReport(&c2);
+    if (raw.len == 0) {
+        try outWriteAll(
+            "HaskMate.json loaded but both \"cmd\" and \"script\" are empty.\n" ++
+                "Set one of them to the command you want to run.\n" ++
+                "You can use {file} and {dir} placeholders.\n",
+        );
+        return;
+    }
+
+    const dir_path = std.fs.path.dirname(fullPath) orelse ".";
+    const expanded = try expandPlaceholders(alloc, raw, fullPath, dir_path);
+    defer alloc.free(expanded);
+
+    try outPrint("{s}{s}{s} Running: {s}\n", .{
+        Colors.green, projectName, Colors.white, expanded,
+    });
+
+    var child = try spawnShell(alloc, expanded);
+    try waitAndReport(&child);
 }
 
 fn monitorScript(
@@ -134,7 +150,7 @@ fn monitorScript(
     fullPath: []const u8,
     maybe_settings: ?*const settings_mod.Settings,
 ) !void {
-    try runScriptOrCmd(alloc, maybe_settings, fullPath);
+    try runConfiguredCommand(alloc, maybe_settings, fullPath);
     var last = try getLastModifiedNs(fullPath);
 
     while (true) {
@@ -142,11 +158,11 @@ fn monitorScript(
 
         const current = try getLastModifiedNs(fullPath);
         if (current > last) {
-            try outPrint("{s}{s}{s} Detected file modification. Rebuilding and running...\n", .{
+            try outPrint("{s}{s}{s} Detected file modification. Running command...\n", .{
                 Colors.yellow, projectName, Colors.white,
             });
 
-            try runScriptOrCmd(alloc, maybe_settings, fullPath);
+            try runConfiguredCommand(alloc, maybe_settings, fullPath);
 
             last = try getLastModifiedNs(fullPath);
         }
@@ -162,7 +178,7 @@ pub fn main() !void {
     defer std.process.argsFree(alloc, args);
 
     if (args.len == 1) {
-        try outWriteAll("Please provide a file to monitor as an argument.\nExample: HaskMate app/Main.hs\n");
+        try outWriteAll("Please provide a file to monitor as an argument.\nExample: haskmate ../test/app/test.hs\n");
         return;
     }
 
@@ -229,8 +245,8 @@ pub fn main() !void {
     defer alloc.free(fullPath);
 
     try outPrint("{s}{s}{s} Starting HaskMate v1.3.0...\n", .{ Colors.green, projectName, Colors.white });
-    try outPrint("{s}{s}{s} Running script path: {s}\n", .{ Colors.green, projectName, Colors.white, fullPath });
-    try outPrint("{s}{s}{s} Watching for file modifications. Press {s}Ctrl+C{s} to exit.\n", .{
+    try outPrint("{s}{s}{s} Watching: {s}\n", .{ Colors.green, projectName, Colors.white, fullPath });
+    try outPrint("{s}{s}{s} Press {s}Ctrl+C{s} to exit.\n", .{
         Colors.green, projectName, Colors.white, Colors.red, Colors.white,
     });
 
