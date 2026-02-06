@@ -59,7 +59,7 @@ pub const Logger = struct {
         defer arena.deinit();
         const a = arena.allocator();
 
-        const ts = try timestamp(a);
+        const ts = try formatTimestamp(a);
 
         const tag = levelTag(level);
         const tag_color = levelColor(level);
@@ -110,24 +110,24 @@ pub const Logger = struct {
         };
     }
 
-    fn timestamp(alloc: std.mem.Allocator) ![]const u8 {
+    fn formatTimestamp(allocator: std.mem.Allocator) ![]const u8 {
         const ms = std.time.milliTimestamp();
         const sec: i64 = @divTrunc(ms, 1000);
         const msec: i64 = ms - sec * 1000;
 
-        var t: c.time_t = @intCast(sec);
-        var tm: c.struct_tm = undefined;
+        var now: c.time_t = @intCast(sec);
+        var parts: c.struct_tm = undefined;
 
-        if (c.localtime_r(&t, &tm) == null) {
-            return std.fmt.allocPrint(alloc, "{d}.{d:0>3}", .{ sec, msec });
+        if (c.localtime_r(&now, &parts) == null) {
+            return std.fmt.allocPrint(allocator, "{d}.{d:0>3}", .{ sec, msec });
         }
 
-        var buf: [32]u8 = undefined;
-        const n = c.strftime(&buf, buf.len, "%Y-%m-%d %H:%M:%S", &tm);
-        if (n == 0) {
-            return std.fmt.allocPrint(alloc, "{d}.{d:0>3}", .{ sec, msec });
+        var buffer: [32]u8 = undefined;
+        const count = c.strftime(&buffer, buffer.len, "%Y-%m-%d %H:%M:%S", &parts);
+        if (count == 0) {
+            return std.fmt.allocPrint(allocator, "{d}.{d:0>3}", .{ sec, msec });
         }
 
-        return std.fmt.allocPrint(alloc, "{s}.{d:0>3}", .{ buf[0..@intCast(n)], msec });
+        return std.fmt.allocPrint(allocator, "{s}.{d:0>3}", .{ buffer[0..@intCast(count)], msec });
     }
 };

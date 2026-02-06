@@ -1,20 +1,20 @@
 const std = @import("std");
 
-fn spr(comptime fmt: []const u8, args: anytype) !void {
-    const alloc = std.heap.page_allocator;
-    const s = try std.fmt.allocPrint(alloc, fmt, args);
-    defer alloc.free(s);
-    try std.fs.File.stdout().writeAll(s);
+fn printFmt(comptime fmt: []const u8, args: anytype) !void {
+    const allocator = std.heap.page_allocator;
+    const text = try std.fmt.allocPrint(allocator, fmt, args);
+    defer allocator.free(text);
+    try std.fs.File.stdout().writeAll(text);
 }
 
 pub fn generateConfig() !void {
-    const text =
+    const configTemplate =
         "{\n" ++
         "  \"delay\": 1000000,\n" ++
         "  \"ignore\": [],\n" ++
         "  \"cmd\": \"stack ghc -- {file} && {dir}/test\"\n" ++
         "}\n";
 
-    try std.fs.cwd().writeFile(.{ .sub_path = "Zippy.json", .data = text });
-    try spr("Configuration file generated successfully!\n", .{});
+    try std.fs.cwd().writeFile(.{ .sub_path = "Zippy.json", .data = configTemplate });
+    try printFmt("Configuration file generated successfully!\n", .{});
 }

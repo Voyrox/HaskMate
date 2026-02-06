@@ -7,17 +7,17 @@ pub const Colors = struct {
     pub const green = "\x1b[32m";
 };
 
-fn spr(comptime fmt: []const u8, args: anytype) !void {
-    const alloc = std.heap.page_allocator;
-    const s = try std.fmt.allocPrint(alloc, fmt, args);
-    defer alloc.free(s);
-    try std.fs.File.stdout().writeAll(s);
+fn printFmt(comptime fmt: []const u8, args: anytype) !void {
+    const allocator = std.heap.page_allocator;
+    const text = try std.fmt.allocPrint(allocator, fmt, args);
+    defer allocator.free(text);
+    try std.fs.File.stdout().writeAll(text);
 }
 
-fn repeatChar(alloc: std.mem.Allocator, c: u8, count: usize) ![]u8 {
-    const buf = try alloc.alloc(u8, count);
-    @memset(buf, c);
-    return buf;
+fn repeatByte(allocator: std.mem.Allocator, byte: u8, count: usize) ![]u8 {
+    const buffer = try allocator.alloc(u8, count);
+    @memset(buffer, byte);
+    return buffer;
 }
 
 pub fn displayHelpData(alloc: std.mem.Allocator) !void {
@@ -25,63 +25,85 @@ pub fn displayHelpData(alloc: std.mem.Allocator) !void {
     const boxWidth: usize = message.len + 4;
     const dash_count = boxWidth - 2;
 
-    const line_bytes = try alloc.alloc(u8, dash_count * 3);
-    defer alloc.free(line_bytes);
+    const lineBytes = try alloc.alloc(u8, dash_count * 3);
+    defer alloc.free(lineBytes);
     for (0..dash_count) |i| {
-        const off = i * 3;
-        line_bytes[off + 0] = 0xE2;
-        line_bytes[off + 1] = 0x94;
-        line_bytes[off + 2] = 0x80;
+        const offset = i * 3;
+        lineBytes[offset + 0] = 0xE2;
+        lineBytes[offset + 1] = 0x94;
+        lineBytes[offset + 2] = 0x80;
     }
-    const line = line_bytes;
+    const line = lineBytes;
 
     const padding_count = (boxWidth - message.len - 1) / 2;
-    const padding = try repeatChar(alloc, ' ', padding_count);
+    const padding = try repeatByte(alloc, ' ', padding_count);
     defer alloc.free(padding);
 
-    try spr("{s}┌{s}┐\n", .{ Colors.red, line });
-    try spr("{s}│{s}{s}{s}{s}{s}│\n", .{ Colors.red, padding, Colors.green, message, Colors.red, padding });
-    try spr("{s}└{s}┘\n", .{ Colors.red, line });
+    try printFmt("{s}┌{s}┐\n", .{ Colors.red, line });
+    try printFmt("{s}│{s}{s}{s}{s}{s}│\n", .{ Colors.red, padding, Colors.green, message, Colors.red, padding });
+    try printFmt("{s}└{s}┘\n", .{ Colors.red, line });
 
-    try spr("{s}Example:\n", .{Colors.green});
-    try spr("{s}  zippy app/Main.hs\n\n", .{Colors.white});
+    try printFmt("{s}Example:\n", .{Colors.green});
+    try printFmt("{s}  zippy app/Main.hs\n\n", .{Colors.white});
 
-    try spr("{s}Commands:\n", .{Colors.yellow});
-    try spr("{s}  --help      Display help information\n", .{Colors.white});
-    try spr("{s}  --version   Display version information/Check for updates\n", .{Colors.white});
-    try spr("{s}  --config    Configure Zippy\n", .{Colors.white});
-    try spr("{s}  --log       Display Zippy log\n", .{Colors.white});
-    try spr("{s}  --clear     Clear Zippy log\n", .{Colors.white});
-    try spr("{s}  --credits   Display credits\n", .{Colors.white});
+    try printFmt("{s}Commands:\n", .{Colors.yellow});
+    try printFmt("{s}  --help      Display help information\n", .{Colors.white});
+    try printFmt("{s}  --version   Display version information/Check for updates\n", .{Colors.white});
+    try printFmt("{s}  --config    Configure Zippy\n", .{Colors.white});
+    try printFmt("{s}  --log       Display Zippy log\n", .{Colors.white});
+    try printFmt("{s}  --clear     Clear Zippy log\n", .{Colors.white});
+    try printFmt("{s}  --credits   Display credits\n", .{Colors.white});
 }
 
 pub fn displayConfigData() !void {
-    try spr("{s}Configuration:\n", .{Colors.yellow});
-    try spr("{s}  --SaveLog=true/false      Save the log to a file\n", .{Colors.white});
+    try printFmt("{s}Configuration:\n", .{Colors.yellow});
+    try printFmt("{s}  --SaveLog=true/false      Save the log to a file\n", .{Colors.white});
 }
 
 pub fn displayLogData() !void {
-    try spr("{s}Log:\n", .{Colors.yellow});
-    try spr("{s}  --logPath=path/to/log      Path to the log file\n", .{Colors.white});
+    try printFmt("{s}Log:\n", .{Colors.yellow});
+    try printFmt("{s}  --logPath=path/to/log      Path to the log file\n", .{Colors.white});
 }
 
 pub fn displayClearData() !void {
-    try spr("{s}Clear:\n", .{Colors.yellow});
-    try spr("{s}  --clearLog=true/false      Clear the log file\n", .{Colors.white});
+    try printFmt("{s}Clear:\n", .{Colors.yellow});
+    try printFmt("{s}  --clearLog=true/false      Clear the log file\n", .{Colors.white});
 }
 
 pub fn displayCreditsData() !void {
-    try spr("{s}Credits:\n", .{Colors.yellow});
-    try spr("{s}Developed by: Voyrox | Ewen MacCulloch\n", .{Colors.green});
-    try spr("{s}GitHub: Voyrox\n", .{Colors.green});
-    try spr("{s}\n", .{Colors.white});
+    try printFmt("{s}Credits:\n", .{Colors.yellow});
+    try printFmt("{s}Developed by: Voyrox | Ewen MacCulloch\n", .{Colors.green});
+    try printFmt("{s}GitHub: Voyrox\n", .{Colors.green});
+    try printFmt("{s}\n", .{Colors.white});
 }
 
 const Release = struct {
     tag_name: []const u8,
 };
 
+pub fn getLatestRelease() !Release {
+    const allocator = std.heap.page_allocator;
+    const client = std.net.StreamingClient(.{});
+    const response = try client.get("https://api.github.com/repos/Voyrox/Zippy/releases/latest", .{});
+    defer response.close();
+
+    const body = try response.readToEndAlloc(allocator, 1024 * 1024);
+    defer allocator.free(body);
+
+    const json = try std.json.parse(allocator, body);
+    defer json.deinit();
+
+    const tag_name = try json.get("tag_name").andThen(std.json.asString);
+    return Release{ .tag_name = tag_name };
+}
+
 pub fn displayVersionData() !void {
-    try spr("{s}Zippy version: {s}{s}\n", .{ Colors.green, "v1.3.0", Colors.white });
-    try spr("{s}  https://github.com/Voyrox/Zippy/releases/latest\n", .{Colors.white});
+    const latest = try getLatestRelease();
+    if (std.mem.eql(u8, latest.tag_name, "v1.3.0")) {
+        try printFmt("{s}You are running the latest version: {s}{s}\n", .{ Colors.green, "v1.3.0", Colors.white });
+    } else {
+        try printFmt("{s}A new version is available: {s}{s}\n", .{ Colors.yellow, latest.tag_name, Colors.white });
+        try printFmt("{s}Please update to the latest version for new features and bug fixes.\n", .{Colors.white});
+    }
+    try printFmt("{s}  https://github.com/Voyrox/Zippy/releases/latest\n", .{Colors.white});
 }

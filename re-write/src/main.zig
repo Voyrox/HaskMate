@@ -37,41 +37,46 @@ fn spawnShell(alloc: std.mem.Allocator, cmd: []const u8, cwd: []const u8) !std.p
     return child;
 }
 
-fn replaceAllAlloc(
-    alloc: std.mem.Allocator,
-    input: []const u8,
+fn replaceAll(
+    allocator: std.mem.Allocator,
+    source: []const u8,
     needle: []const u8,
     replacement: []const u8,
 ) ![]u8 {
-    var count: usize = 0;
-    var i: usize = 0;
-    while (i + needle.len <= input.len) : (i += 1) {
-        if (std.mem.eql(u8, input[i .. i + needle.len], needle)) {
-            count += 1;
-            i += needle.len - 1;
+    var matchCount: usize = 0;
+    var cursor: usize = 0;
+
+    while (cursor + needle.len <= source.len) : (cursor += 1) {
+        if (std.mem.eql(u8, source[cursor .. cursor + needle.len], needle)) {
+            matchCount += 1;
+            cursor += needle.len - 1;
         }
     }
-    if (count == 0) return try alloc.dupe(u8, input);
 
-    const new_len = input.len + count * (replacement.len - needle.len);
-    var out = try alloc.alloc(u8, new_len);
+    if (matchCount == 0) return try allocator.dupe(u8, source);
 
-    var in_idx: usize = 0;
-    var out_idx: usize = 0;
+    const newLen = source.len + matchCount * (replacement.len - needle.len);
+    var result = try allocator.alloc(u8, newLen);
 
-    while (in_idx < input.len) {
-        if (in_idx + needle.len <= input.len and std.mem.eql(u8, input[in_idx .. in_idx + needle.len], needle)) {
-            std.mem.copyForwards(u8, out[out_idx .. out_idx + replacement.len], replacement);
-            out_idx += replacement.len;
-            in_idx += needle.len;
+    var srcIndex: usize = 0;
+    var dstIndex: usize = 0;
+
+    while (srcIndex < source.len) {
+        const remaining = source.len - srcIndex;
+        const isMatch = remaining >= needle.len and std.mem.eql(u8, source[srcIndex .. srcIndex + needle.len], needle);
+
+        if (isMatch) {
+            std.mem.copyForwards(u8, result[dstIndex .. dstIndex + replacement.len], replacement);
+            dstIndex += replacement.len;
+            srcIndex += needle.len;
         } else {
-            out[out_idx] = input[in_idx];
-            out_idx += 1;
-            in_idx += 1;
+            result[dstIndex] = source[srcIndex];
+            dstIndex += 1;
+            srcIndex += 1;
         }
     }
 
-    return out;
+    return result;
 }
 
 fn expandPlaceholders(
@@ -80,9 +85,9 @@ fn expandPlaceholders(
     file_path: []const u8,
     dir_path: []const u8,
 ) ![]u8 {
-    const step1 = try replaceAllAlloc(alloc, cmd, "{file}", file_path);
+    const step1 = try replaceAll(alloc, cmd, "{file}", file_path);
     defer alloc.free(step1);
-    return try replaceAllAlloc(alloc, step1, "{dir}", dir_path);
+    return try replaceAll(alloc, step1, "{dir}", dir_path);
 }
 
 fn runConfiguredCommand(

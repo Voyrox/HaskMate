@@ -6,13 +6,13 @@ pub const Settings = struct {
     cmd: []const u8,
 };
 
-const SettingsJson = struct {
+const SettingsFile = struct {
     ignore: ?[]const []const u8 = null,
     delay: ?u64 = null,
     cmd: ?[]const u8 = null,
 };
 
-pub fn loadSettings(alloc: std.mem.Allocator, path: []const u8) !?Settings {
+pub fn loadSettings(allocator: std.mem.Allocator, path: []const u8) !?Settings {
     var cwd = std.fs.cwd();
 
     const file = cwd.openFile(path, .{}) catch |err| switch (err) {
@@ -21,33 +21,32 @@ pub fn loadSettings(alloc: std.mem.Allocator, path: []const u8) !?Settings {
     };
     defer file.close();
 
-    const bytes = try file.readToEndAlloc(alloc, 1024 * 1024);
-    defer alloc.free(bytes);
+    const bytes = try file.readToEndAlloc(allocator, 1024 * 1024);
+    defer allocator.free(bytes);
 
-    var parsed = std.json.parseFromSlice(SettingsJson, alloc, bytes, .{ .ignore_unknown_fields = true }) catch {
+    var parsed = std.json.parseFromSlice(SettingsFile, allocator, bytes, .{ .ignore_unknown_fields = true }) catch {
         return null;
     };
-
     defer parsed.deinit();
 
-    const pj = parsed.value;
+    const parsedValue = parsed.value;
 
-    const ignore_list = pj.ignore orelse &[_][]const u8{};
-    const delay_val: ?u64 = pj.delay; // microseconds
-    const cmd_val = pj.cmd orelse "";
+    const ignoreList = parsedValue.ignore orelse &[_][]const u8{};
+    const delayValue: ?u64 = parsedValue.delay;
+    const cmdValue = parsedValue.cmd orelse "";
 
-    var ignore_out = try alloc.alloc([]const u8, ignore_list.len);
-    for (ignore_list, 0..) |s, i| ignore_out[i] = try alloc.dupe(u8, s);
+    var ignoreOut = try allocator.alloc([]const u8, ignoreList.len);
+    for (ignoreList, 0..) |entry, index| ignoreOut[index] = try allocator.dupe(u8, entry);
 
     return Settings{
-        .ignore = ignore_out,
-        .delay = delay_val,
-        .cmd = try alloc.dupe(u8, cmd_val),
+        .ignore = ignoreOut,
+        .delay = delayValue,
+        .cmd = try allocator.dupe(u8, cmdValue),
     };
 }
 
-pub fn freeSettings(alloc: std.mem.Allocator, s: *Settings) void {
-    for (s.ignore) |it| alloc.free(it);
-    alloc.free(s.ignore);
-    alloc.free(s.cmd);
+pub fn freeSettings(allocator: std.mem.Allocator, settings: *Settings) void {
+    for (settings.ignore) |item| allocator.free(item);
+    allocator.free(settings.ignore);
+    allocator.free(settings.cmd);
 }
