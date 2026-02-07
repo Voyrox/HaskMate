@@ -1,5 +1,6 @@
 {
   "delay": 1000000,
   "ignore": [],
+  "save_log": true,
   "cmd": "stack ghc -- {file} && {dir}/test"
 }

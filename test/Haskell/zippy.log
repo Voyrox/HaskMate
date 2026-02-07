@@ -1,0 +1,12 @@
+2026-02-07 11:13:46.+347 [INFO] zippy Log cleared: zippy.log
+2026-02-07 11:13:51.+208 [INFO] zippy Starting Zippy v1.3.0
+2026-02-07 11:13:51.+209 [INFO] zippy Logging to: zippy.log
+2026-02-07 11:13:51.+209 [INFO] zippy Watching file: /home/ewen/Documents/GitHub/HaskMate/test/Haskell/./app/test.hs
+2026-02-07 11:13:51.+209 [INFO] zippy Press Ctrl+C to exit
+2026-02-07 11:13:51.+209 [INFO] zippy Running: stack ghc -- /home/ewen/Documents/GitHub/HaskMate/test/Haskell/./app/test.hs && /home/ewen/Documents/GitHub/HaskMate/test/Haskell/./app/test
+My script running!s
+2026-02-07 11:13:55.+540 [WARN] zippy File changed; re-running command…
+2026-02-07 11:13:55.+540 [INFO] zippy Running: stack ghc -- /home/ewen/Documents/GitHub/HaskMate/test/Haskell/./app/test.hs && /home/ewen/Documents/GitHub/HaskMate/test/Haskell/./app/test
+[1 of 1] Compiling Main             ( /home/ewen/Documents/GitHub/HaskMate/test/Haskell/app/test.hs, /home/ewen/Documents/GitHub/HaskMate/test/Haskell/app/test.o )
+Linking /home/ewen/Documents/GitHub/HaskMate/test/Haskell/app/test ...
+My script running!

@@ -16,6 +16,9 @@ pub const Logger = struct {
     alloc: std.mem.Allocator,
     name: []const u8 = "zippy",
     use_color: bool = true,
+    file: ?std.fs.File = null,
+    log_path: ?[]const u8 = null,
+    mutex: std.Thread.Mutex = .{},
 
     // ANSI
     const Reset = "\x1b[0m";
@@ -31,7 +34,23 @@ pub const Logger = struct {
             .alloc = alloc,
             .name = name,
             .use_color = stderr_is_tty,
+            .file = null,
+            .log_path = null,
         };
+    }
+
+    pub fn enableFileLogging(self: *Logger, path: []const u8) !void {
+        const file = try std.fs.cwd().createFile(path, .{ .read = true, .truncate = false, .exclusive = false, .mode = 0o644 });
+        try file.seekFromEnd(0);
+        self.file = file;
+        self.log_path = try self.alloc.dupe(u8, path);
+    }
+
+    pub fn deinit(self: *Logger) void {
+        if (self.file) |f| f.close();
+        self.file = null;
+        if (self.log_path) |p| self.alloc.free(p);
+        self.log_path = null;
     }
 
     pub fn setColor(self: *Logger, enabled: bool) void {
@@ -68,25 +87,28 @@ pub const Logger = struct {
 
         const errf = std.fs.File.stderr();
 
-        if (self.use_color) {
-            const line = try std.fmt.allocPrint(
+        const line = try if (self.use_color)
+            std.fmt.allocPrint(
                 a,
                 "{s}{s}{s} {s}[{s}]{s} {s}{s}{s} {s}\n",
-                .{
-                    Dim, ts, Reset, // timestamp
-                    tag_color, tag, Reset, // [LEVEL]
-                    Cyan, self.name, Reset, // name
-                    msg,
-                },
-            );
-            try errf.writeAll(line);
-        } else {
-            const line = try std.fmt.allocPrint(
-                a,
-                "{s} [{s}] {s} {s}\n",
-                .{ ts, tag, self.name, msg },
-            );
-            try errf.writeAll(line);
+                .{ Dim, ts, Reset, tag_color, tag, Reset, Cyan, self.name, Reset, msg },
+            )
+        else
+            std.fmt.allocPrint(a, "{s} [{s}] {s} {s}\n", .{ ts, tag, self.name, msg });
+
+        try errf.writeAll(line);
+
+        if (self.file) |_| {
+            const plain_line = try std.fmt.allocPrint(a, "{s} [{s}] {s} {s}\n", .{ ts, tag, self.name, msg });
+            self.writeRaw(plain_line);
+        }
+    }
+
+    pub fn writeRaw(self: *Logger, data: []const u8) void {
+        if (self.file) |*f| {
+            self.mutex.lock();
+            defer self.mutex.unlock();
+            _ = f.writeAll(data) catch {};
         }
     }
 

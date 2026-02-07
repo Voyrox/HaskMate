@@ -90,6 +90,21 @@ fn expandPlaceholders(
     return try replaceAll(alloc, step1, "{dir}", dir_path);
 }
 
+fn printSettingsSummary(
+    settings: *const settings_mod.Settings,
+    has_file: bool,
+) !void {
+    const effective_delay = settings.delay orelse settings_mod.default_delay_us;
+    try outPrint(
+        "Zippy configuration ({s}):\n",
+        .{if (has_file) "from Zippy.json" else "defaults"},
+    );
+    try outPrint("  delay (us): {d}\n", .{effective_delay});
+    try outPrint("  cmd      : {s}\n", .{settings.cmd});
+    try outPrint("  save_log : {s}\n", .{if (settings.save_log) "true" else "false"});
+    try outPrint("  log_path : {s}\n", .{settings.log_path});
+}
+
 fn runConfiguredCommand(
     alloc: std.mem.Allocator,
     log: *Logger,
@@ -121,7 +136,42 @@ fn runConfiguredCommand(
 
     try log.info("Running: {s}", .{expanded});
 
-    return try spawnShell(alloc, expanded, dir_path);
+    if (!s.save_log) {
+        return try spawnShell(alloc, expanded, dir_path);
+    }
+
+    // When save_log is enabled, capture stdout/stderr and mirror to both stdout and the log file.
+    var child = std.process.Child.init(&[_][]const u8{ "sh", "-c", expanded }, alloc);
+    child.stdin_behavior = .Inherit;
+    child.stdout_behavior = .Pipe;
+    child.stderr_behavior = .Pipe;
+    child.cwd = dir_path;
+    try child.spawn();
+
+    // Stream stdout (and merged stderr when possible).
+    if (child.stdout) |*outp| {
+        var buffer: [4096]u8 = undefined;
+        while (true) {
+            const n = try outp.read(&buffer);
+            if (n == 0) break;
+            const slice = buffer[0..n];
+            _ = std.fs.File.stdout().writeAll(slice) catch {};
+            log.writeRaw(slice);
+        }
+    }
+
+    if (child.stderr) |*errp| {
+        var buffer: [4096]u8 = undefined;
+        while (true) {
+            const n = try errp.read(&buffer);
+            if (n == 0) break;
+            const slice = buffer[0..n];
+            _ = std.fs.File.stderr().writeAll(slice) catch {};
+            log.writeRaw(slice);
+        }
+    }
+
+    return child;
 }
 
 const WatchState = struct {
@@ -233,18 +283,6 @@ pub fn main() !void {
         return;
     }
 
-    if (memory.eql(u8, arg1, "--config")) {
-        try commands.displayConfigData();
-        return;
-    }
-    if (memory.eql(u8, arg1, "--log")) {
-        try commands.displayLogData();
-        return;
-    }
-    if (memory.eql(u8, arg1, "--clear")) {
-        try commands.displayClearData();
-        return;
-    }
     if (memory.eql(u8, arg1, "--credits")) {
         try commands.displayCreditsData();
         return;
@@ -261,12 +299,62 @@ pub fn main() !void {
         loaded_ptr = &loaded.?;
         try log.success("Loaded settings from Zippy.json", .{});
     } else {
+        loaded = try settings_mod.defaultSettings(alloc);
+        loaded_ptr = &loaded.?;
         try log.warn("No Zippy.json found; using defaults", .{});
     }
 
     defer if (loaded_ptr) |p| settings_mod.freeSettings(alloc, p);
 
-    const delay_us: u64 = if (loaded_ptr) |p| (p.delay orelse 1_000_000) else 1_000_000;
+    const delay_us: u64 = if (loaded_ptr) |p| (p.delay orelse settings_mod.default_delay_us) else settings_mod.default_delay_us;
+
+    if (loaded_ptr) |p| {
+        if (p.save_log) {
+            log.enableFileLogging(p.log_path) catch |err| {
+                try log.warn("Could not open log file {s}: {s}", .{ p.log_path, @errorName(err) });
+            };
+        }
+    }
+
+    if (memory.eql(u8, arg1, "--config")) {
+        try printSettingsSummary(loaded_ptr.?, maybe_s != null);
+        return;
+    }
+    if (memory.eql(u8, arg1, "--log")) {
+        if (loaded_ptr.?.save_log) {
+            const log_file = std.fs.cwd().openFile(loaded_ptr.?.log_path, .{}) catch |err| switch (err) {
+                error.FileNotFound => {
+                    try log.warn("Log file not found: {s}", .{loaded_ptr.?.log_path});
+                    return;
+                },
+                else => return err,
+            };
+            defer log_file.close();
+            const contents = try log_file.readToEndAlloc(alloc, 10 * 1024 * 1024);
+            defer alloc.free(contents);
+            try outWriteAll(contents);
+        } else {
+            try log.warn("Logging is disabled (save_log=false)", .{});
+        }
+        return;
+    }
+    if (memory.eql(u8, arg1, "--clear")) {
+        if (loaded_ptr.?.save_log) {
+            if (log.file) |*f| {
+                f.seekTo(0) catch {};
+                f.setEndPos(0) catch {};
+            } else {
+                std.fs.cwd().writeFile(.{ .sub_path = loaded_ptr.?.log_path, .data = "" }) catch |err| switch (err) {
+                    error.FileNotFound => try log.warn("Log file not found: {s}", .{loaded_ptr.?.log_path}),
+                    else => return err,
+                };
+            }
+            try log.info("Log cleared: {s}", .{loaded_ptr.?.log_path});
+        } else {
+            try log.warn("Logging is disabled (save_log=false)", .{});
+        }
+        return;
+    }
 
     const cwd = try std.fs.cwd().realpathAlloc(alloc, ".");
     defer alloc.free(cwd);
@@ -281,12 +369,19 @@ pub fn main() !void {
     const watch_file: ?[]const u8 = if (is_dir) null else targetPath;
 
     try log.info("Starting Zippy v1.3.0", .{});
+    if (loaded_ptr) |p| {
+        if (p.save_log) {
+            try log.info("Logging to: {s}", .{p.log_path});
+        }
+    }
     if (watch_file) |_f| {
         try log.info("Watching file: {s}", .{_f});
     } else {
         try log.info("Watching directory: {s}", .{watch_dir});
     }
     try log.info("Press Ctrl+C to exit", .{});
+
+    defer log.deinit();
 
     try monitorScript(alloc, &log, delay_us, watch_dir, watch_file, loaded_ptr);
 }

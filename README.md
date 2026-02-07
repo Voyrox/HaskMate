@@ -1,6 +1,6 @@
 # Zippy: A file-watching CLI for faster edit–build–run loops
 
-Zippy is a lightweight Zig-built CLI that watches a file or directory and reruns your command the moment you save. It keeps your stdout clean, logs to stderr with levels, and stays out of your way during the edit–build–run loop.
+Zippy is a lightweight CLI that watches a file or directory and reruns your command the moment you save. It keeps your stdout clean, logs to stderr with levels, and stays out of your way during the edit–build–run loop.
 
 ## Quick start
 
@@ -25,6 +25,7 @@ Zippy loads `Zippy.json` from the current working directory:
 {
   "delay": 1000000,
   "ignore": [],
+  "save_log": false,
   "cmd": "make && ./build/out"
   // OR
   "cmd": "node index.js"
@@ -34,6 +35,9 @@ Zippy loads `Zippy.json` from the current working directory:
 - `delay` (microseconds): debounce between change checks (default: 1_000_000).
 - `ignore`: reserved for future ignore patterns.
 - `cmd`: command to execute when changes occur. Placeholders: `{file}` (changed file or watched dir), `{dir}` (watched directory).
+- `save_log` (bool): when true, also write logs to `log_path` (default: `false`).
+- `log_path` (string): path to the log file when `save_log` is true (default: `zippy.log`).
+  When `save_log=true`, child command stdout/stderr is tee’d into the same log.
 
 Generate a starter config: `zippy --generate`.
 
@@ -43,8 +47,8 @@ Generate a starter config: `zippy --generate`.
 - `--version` print version
 - `--commands` list commands
 - `--config` show config help
-- `--log` log options
-- `--clear` clear log (future)
+- `--log` print the configured log file (when `save_log=true`; includes child output)
+- `--clear` truncate the configured log file (when `save_log=true`)
 - `--credits` show credits
 - `--generate` write `Zippy.json`
 

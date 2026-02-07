@@ -57,18 +57,21 @@ pub fn displayHelpData(alloc: std.mem.Allocator) !void {
 }
 
 pub fn displayConfigData() !void {
-    try printFmt("{s}Configuration:\n", .{Colors.yellow});
-    try printFmt("{s}  --SaveLog=true/false      Save the log to a file\n", .{Colors.white});
+    try printFmt("{s}Configuration options (Zippy.json):\n", .{Colors.yellow});
+    try printFmt("{s}  delay (u64 microseconds)        Debounce between checks (default 1000000)\n", .{Colors.white});
+    try printFmt("{s}  cmd (string)                    Command to run; placeholders {file}, {dir}\n", .{Colors.white});
+    try printFmt("{s}  save_log (bool)                Enable log file (default false)\n", .{Colors.white});
+    try printFmt("{s}  log_path (string)              Path to log file (default zippy.log)\n", .{Colors.white});
 }
 
 pub fn displayLogData() !void {
-    try printFmt("{s}Log:\n", .{Colors.yellow});
-    try printFmt("{s}  --logPath=path/to/log      Path to the log file\n", .{Colors.white});
+    try printFmt("{s}--log shows log file contents when save_log=true.\n", .{Colors.yellow});
+    try printFmt("{s}Log file path is configured via log_path in Zippy.json.\n", .{Colors.white});
+    try printFmt("{s}When save_log=true, child command output is also tee'd to the log.\n", .{Colors.white});
 }
 
 pub fn displayClearData() !void {
-    try printFmt("{s}Clear:\n", .{Colors.yellow});
-    try printFmt("{s}  --clearLog=true/false      Clear the log file\n", .{Colors.white});
+    try printFmt("{s}--clear truncates the configured log file when save_log=true.\n", .{Colors.yellow});
 }
 
 pub fn displayCreditsData() !void {
