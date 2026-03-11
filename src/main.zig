@@ -1,12 +1,12 @@
 const std = @import("std");
 
 const commands = @import("commands.zig");
-const settings_mod = @import("settings.zig");
+const settingsMod = @import("settings.zig");
 const generate = @import("generate.zig");
-const logger_mod = @import("logger.zig");
+const loggerMod = @import("logger.zig");
 const Colors = commands.Colors;
 const projectName = "[Zippy]";
-const Logger = logger_mod.Logger;
+const Logger = loggerMod.Logger;
 
 fn outWriteAll(s: []const u8) !void {
     try std.fs.File.stdout().writeAll(s);
@@ -82,37 +82,37 @@ fn replaceAll(
 fn expandPlaceholders(
     alloc: std.mem.Allocator,
     cmd: []const u8,
-    file_path: []const u8,
-    dir_path: []const u8,
+    filePath: []const u8,
+    dirPath: []const u8,
 ) ![]u8 {
-    const step1 = try replaceAll(alloc, cmd, "{file}", file_path);
+    const step1 = try replaceAll(alloc, cmd, "{file}", filePath);
     defer alloc.free(step1);
-    return try replaceAll(alloc, step1, "{dir}", dir_path);
+    return try replaceAll(alloc, step1, "{dir}", dirPath);
 }
 
 fn printSettingsSummary(
-    settings: *const settings_mod.Settings,
-    has_file: bool,
+    settings: *const settingsMod.Settings,
+    hasFile: bool,
 ) !void {
-    const effective_delay = settings.delay orelse settings_mod.default_delay_us;
+    const effectiveDelay = settings.delay orelse settingsMod.defaultDelayUs;
     try outPrint(
         "Zippy configuration ({s}):\n",
-        .{if (has_file) "from Zippy.json" else "defaults"},
+        .{if (hasFile) "from Zippy.json" else "defaults"},
     );
-    try outPrint("  delay (us): {d}\n", .{effective_delay});
+    try outPrint("  delay (us): {d}\n", .{effectiveDelay});
     try outPrint("  cmd      : {s}\n", .{settings.cmd});
-    try outPrint("  save_log : {s}\n", .{if (settings.save_log) "true" else "false"});
-    try outPrint("  log_path : {s}\n", .{settings.log_path});
+    try outPrint("  save_log : {s}\n", .{if (settings.saveLog) "true" else "false"});
+    try outPrint("  log_path : {s}\n", .{settings.logPath});
 }
 
 fn runConfiguredCommand(
     alloc: std.mem.Allocator,
     log: *Logger,
-    maybe_settings: ?*const settings_mod.Settings,
-    dir_path: []const u8,
-    file_path: []const u8,
+    maybeSettings: ?*const settingsMod.Settings,
+    dirPath: []const u8,
+    filePath: []const u8,
 ) !std.process.Child {
-    if (maybe_settings == null) {
+    if (maybeSettings == null) {
         try log.warn("No Zippy.json found. Create one with --generate", .{});
         try std.fs.File.stderr().writeAll(
             "{\n" ++
@@ -125,19 +125,19 @@ fn runConfiguredCommand(
         return error.Invalid;
     }
 
-    const s = maybe_settings.?;
+    const s = maybeSettings.?;
     if (s.cmd.len == 0) {
         try log.err("Zippy.json loaded but \"cmd\" is empty", .{});
         return error.Invalid;
     }
 
-    const expanded = try expandPlaceholders(alloc, s.cmd, file_path, dir_path);
+    const expanded = try expandPlaceholders(alloc, s.cmd, filePath, dirPath);
     defer alloc.free(expanded);
 
     try log.info("Running: {s}", .{expanded});
 
-    if (!s.save_log) {
-        return try spawnShell(alloc, expanded, dir_path);
+    if (!s.saveLog) {
+        return try spawnShell(alloc, expanded, dirPath);
     }
 
     // When save_log is enabled, capture stdout/stderr and mirror to both stdout and the log file.
@@ -145,7 +145,7 @@ fn runConfiguredCommand(
     child.stdin_behavior = .Inherit;
     child.stdout_behavior = .Pipe;
     child.stderr_behavior = .Pipe;
-    child.cwd = dir_path;
+    child.cwd = dirPath;
     try child.spawn();
 
     // Stream stdout (and merged stderr when possible).
@@ -176,75 +176,75 @@ fn runConfiguredCommand(
 
 const WatchState = struct {
     mtime: i128,
-    file_path: []const u8,
+    filePath: []const u8,
     owns: bool,
 };
 
 fn freeWatchState(alloc: std.mem.Allocator, state: *WatchState) void {
-    if (state.owns) alloc.free(state.file_path);
+    if (state.owns) alloc.free(state.filePath);
     state.owns = false;
 }
 
 fn computeWatchState(
     alloc: std.mem.Allocator,
-    watch_dir: []const u8,
-    maybe_file: ?[]const u8,
+    watchDir: []const u8,
+    maybeFile: ?[]const u8,
 ) !WatchState {
-    if (maybe_file) |file_path| {
-        const st = try std.fs.cwd().statFile(file_path);
-        return .{ .mtime = st.mtime, .file_path = file_path, .owns = false };
+    if (maybeFile) |filePath| {
+        const st = try std.fs.cwd().statFile(filePath);
+        return .{ .mtime = st.mtime, .filePath = filePath, .owns = false };
     }
 
-    var dir = try std.fs.cwd().openDir(watch_dir, .{ .iterate = true });
+    var dir = try std.fs.cwd().openDir(watchDir, .{ .iterate = true });
     defer dir.close();
 
-    const dir_stat = try dir.stat();
-    var best_mtime: i128 = dir_stat.mtime;
-    var best_path: []const u8 = watch_dir;
+    const dirStat = try dir.stat();
+    var bestMtime: i128 = dirStat.mtime;
+    var bestPath: []const u8 = watchDir;
     var owns: bool = false;
 
     var it = dir.iterate();
     while (try it.next()) |entry| {
-        const entry_stat = try dir.statFile(entry.name);
-        if (entry_stat.mtime > best_mtime) {
-            if (owns) alloc.free(best_path);
-            best_mtime = entry_stat.mtime;
-            best_path = try std.fs.path.join(alloc, &[_][]const u8{ watch_dir, entry.name });
+        const entryStat = try dir.statFile(entry.name);
+        if (entryStat.mtime > bestMtime) {
+            if (owns) alloc.free(bestPath);
+            bestMtime = entryStat.mtime;
+            bestPath = try std.fs.path.join(alloc, &[_][]const u8{ watchDir, entry.name });
             owns = true;
         }
     }
 
-    return .{ .mtime = best_mtime, .file_path = best_path, .owns = owns };
+    return .{ .mtime = bestMtime, .filePath = bestPath, .owns = owns };
 }
 
 fn monitorScript(
     alloc: std.mem.Allocator,
     log: *Logger,
-    delay_us: u64,
-    watch_dir: []const u8,
-    watch_file: ?[]const u8,
-    maybe_settings: ?*const settings_mod.Settings,
+    delayUs: u64,
+    watchDir: []const u8,
+    watchFile: ?[]const u8,
+    maybeSettings: ?*const settingsMod.Settings,
 ) !void {
-    var state = try computeWatchState(alloc, watch_dir, watch_file);
+    var state = try computeWatchState(alloc, watchDir, watchFile);
     defer freeWatchState(alloc, &state);
 
-    var current_child = try runConfiguredCommand(alloc, log, maybe_settings, watch_dir, state.file_path);
+    var currentChild = try runConfiguredCommand(alloc, log, maybeSettings, watchDir, state.filePath);
 
     while (true) {
-        std.Thread.sleep(delay_us * std.time.ns_per_us);
+        std.Thread.sleep(delayUs * std.time.ns_per_us);
 
-        var next = try computeWatchState(alloc, watch_dir, watch_file);
+        var next = try computeWatchState(alloc, watchDir, watchFile);
         defer freeWatchState(alloc, &next);
 
         if (next.mtime > state.mtime) {
             try log.warn("File changed; re-running command…", .{});
-            _ = current_child.kill() catch |e| switch (e) {
+            _ = currentChild.kill() catch |e| switch (e) {
                 error.ProcessNotFound => {},
                 else => return e,
             };
-            _ = current_child.wait() catch {};
+            _ = currentChild.wait() catch {};
 
-            current_child = try runConfiguredCommand(alloc, log, maybe_settings, watch_dir, next.file_path);
+            currentChild = try runConfiguredCommand(alloc, log, maybeSettings, watchDir, next.filePath);
 
             freeWatchState(alloc, &state);
             state = next;
@@ -254,9 +254,9 @@ fn monitorScript(
 }
 
 pub fn main() !void {
-    var gpa_state = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa_state.deinit();
-    const alloc = gpa_state.allocator();
+    var gpaState = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpaState.deinit();
+    const alloc = gpaState.allocator();
     var log = Logger.init(alloc, "zippy");
 
     const args = try std.process.argsAlloc(alloc);
@@ -290,47 +290,47 @@ pub fn main() !void {
 
     const jsonPath = "Zippy.json";
 
-    var loaded: ?settings_mod.Settings = null;
-    var loaded_ptr: ?*settings_mod.Settings = null;
+    var loaded: ?settingsMod.Settings = null;
+    var loadedPtr: ?*settingsMod.Settings = null;
 
-    const maybe_s = try settings_mod.loadSettings(alloc, jsonPath);
-    if (maybe_s) |s| {
+    const maybeSettings = try settingsMod.loadSettings(alloc, jsonPath);
+    if (maybeSettings) |s| {
         loaded = s;
-        loaded_ptr = &loaded.?;
+        loadedPtr = &loaded.?;
         try log.success("Loaded settings from Zippy.json", .{});
     } else {
-        loaded = try settings_mod.defaultSettings(alloc);
-        loaded_ptr = &loaded.?;
+        loaded = try settingsMod.defaultSettings(alloc);
+        loadedPtr = &loaded.?;
         try log.warn("No Zippy.json found; using defaults", .{});
     }
 
-    defer if (loaded_ptr) |p| settings_mod.freeSettings(alloc, p);
+    defer if (loadedPtr) |p| settingsMod.freeSettings(alloc, p);
 
-    const delay_us: u64 = if (loaded_ptr) |p| (p.delay orelse settings_mod.default_delay_us) else settings_mod.default_delay_us;
+    const delayUs: u64 = if (loadedPtr) |p| (p.delay orelse settingsMod.defaultDelayUs) else settingsMod.defaultDelayUs;
 
-    if (loaded_ptr) |p| {
-        if (p.save_log) {
-            log.enableFileLogging(p.log_path) catch |err| {
-                try log.warn("Could not open log file {s}: {s}", .{ p.log_path, @errorName(err) });
+    if (loadedPtr) |p| {
+        if (p.saveLog) {
+            log.enableFileLogging(p.logPath) catch |err| {
+                try log.warn("Could not open log file {s}: {s}", .{ p.logPath, @errorName(err) });
             };
         }
     }
 
     if (memory.eql(u8, arg1, "--config")) {
-        try printSettingsSummary(loaded_ptr.?, maybe_s != null);
+        try printSettingsSummary(loadedPtr.?, maybeSettings != null);
         return;
     }
     if (memory.eql(u8, arg1, "--log")) {
-        if (loaded_ptr.?.save_log) {
-            const log_file = std.fs.cwd().openFile(loaded_ptr.?.log_path, .{}) catch |err| switch (err) {
+        if (loadedPtr.?.saveLog) {
+            const logFile = std.fs.cwd().openFile(loadedPtr.?.logPath, .{}) catch |err| switch (err) {
                 error.FileNotFound => {
-                    try log.warn("Log file not found: {s}", .{loaded_ptr.?.log_path});
+                    try log.warn("Log file not found: {s}", .{loadedPtr.?.logPath});
                     return;
                 },
                 else => return err,
             };
-            defer log_file.close();
-            const contents = try log_file.readToEndAlloc(alloc, 10 * 1024 * 1024);
+            defer logFile.close();
+            const contents = try logFile.readToEndAlloc(alloc, 10 * 1024 * 1024);
             defer alloc.free(contents);
             try outWriteAll(contents);
         } else {
@@ -339,17 +339,17 @@ pub fn main() !void {
         return;
     }
     if (memory.eql(u8, arg1, "--clear")) {
-        if (loaded_ptr.?.save_log) {
+        if (loadedPtr.?.saveLog) {
             if (log.file) |*f| {
                 f.seekTo(0) catch {};
                 f.setEndPos(0) catch {};
             } else {
-                std.fs.cwd().writeFile(.{ .sub_path = loaded_ptr.?.log_path, .data = "" }) catch |err| switch (err) {
-                    error.FileNotFound => try log.warn("Log file not found: {s}", .{loaded_ptr.?.log_path}),
+                std.fs.cwd().writeFile(.{ .sub_path = loadedPtr.?.logPath, .data = "" }) catch |err| switch (err) {
+                    error.FileNotFound => try log.warn("Log file not found: {s}", .{loadedPtr.?.logPath}),
                     else => return err,
                 };
             }
-            try log.info("Log cleared: {s}", .{loaded_ptr.?.log_path});
+            try log.info("Log cleared: {s}", .{loadedPtr.?.logPath});
         } else {
             try log.warn("Logging is disabled (save_log=false)", .{});
         }
@@ -363,25 +363,25 @@ pub fn main() !void {
     defer alloc.free(targetPath);
 
     const st = try std.fs.cwd().statFile(targetPath);
-    const is_dir = st.kind == .directory;
+    const isDir = st.kind == .directory;
 
-    const watch_dir: []const u8 = if (is_dir) targetPath else (std.fs.path.dirname(targetPath) orelse cwd);
-    const watch_file: ?[]const u8 = if (is_dir) null else targetPath;
+    const watchDir: []const u8 = if (isDir) targetPath else (std.fs.path.dirname(targetPath) orelse cwd);
+    const watchFile: ?[]const u8 = if (isDir) null else targetPath;
 
     try log.info("Starting Zippy v1.3.0", .{});
-    if (loaded_ptr) |p| {
-        if (p.save_log) {
-            try log.info("Logging to: {s}", .{p.log_path});
+    if (loadedPtr) |p| {
+        if (p.saveLog) {
+            try log.info("Logging to: {s}", .{p.logPath});
         }
     }
-    if (watch_file) |_f| {
-        try log.info("Watching file: {s}", .{_f});
+    if (watchFile) |watchedFile| {
+        try log.info("Watching file: {s}", .{watchedFile});
     } else {
-        try log.info("Watching directory: {s}", .{watch_dir});
+        try log.info("Watching directory: {s}", .{watchDir});
     }
     try log.info("Press Ctrl+C to exit", .{});
 
     defer log.deinit();
 
-    try monitorScript(alloc, &log, delay_us, watch_dir, watch_file, loaded_ptr);
+    try monitorScript(alloc, &log, delayUs, watchDir, watchFile, loadedPtr);
 }

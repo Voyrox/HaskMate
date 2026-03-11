@@ -24,11 +24,11 @@ fn repeatByte(allocator: std.mem.Allocator, byte: u8, count: usize) ![]u8 {
 pub fn displayHelpData(alloc: std.mem.Allocator) !void {
     const message = "Welcome to Zippy!";
     const boxWidth: usize = message.len + 4;
-    const dash_count = boxWidth - 2;
+    const dashCount = boxWidth - 2;
 
-    const lineBytes = try alloc.alloc(u8, dash_count * 3);
+    const lineBytes = try alloc.alloc(u8, dashCount * 3);
     defer alloc.free(lineBytes);
-    for (0..dash_count) |i| {
+    for (0..dashCount) |i| {
         const offset = i * 3;
         lineBytes[offset + 0] = 0xE2;
         lineBytes[offset + 1] = 0x94;
@@ -36,8 +36,8 @@ pub fn displayHelpData(alloc: std.mem.Allocator) !void {
     }
     const line = lineBytes;
 
-    const padding_count = (boxWidth - message.len - 1) / 2;
-    const padding = try repeatByte(alloc, ' ', padding_count);
+    const paddingCount = (boxWidth - message.len - 1) / 2;
+    const padding = try repeatByte(alloc, ' ', paddingCount);
     defer alloc.free(padding);
 
     try printFmt("{s}┌{s}┐\n", .{ Colors.red, line });

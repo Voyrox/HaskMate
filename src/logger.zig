@@ -15,9 +15,9 @@ const c = @cImport({
 pub const Logger = struct {
     alloc: std.mem.Allocator,
     name: []const u8 = "zippy",
-    use_color: bool = true,
+    useColor: bool = true,
     file: ?std.fs.File = null,
-    log_path: ?[]const u8 = null,
+    logPath: ?[]const u8 = null,
     mutex: std.Thread.Mutex = .{},
 
     // ANSI
@@ -29,13 +29,13 @@ pub const Logger = struct {
     const Cyan = "\x1b[36m";
 
     pub fn init(alloc: std.mem.Allocator, name: []const u8) Logger {
-        const stderr_is_tty = std.posix.isatty(std.fs.File.stderr().handle);
+        const stderrIsTty = std.posix.isatty(std.fs.File.stderr().handle);
         return .{
             .alloc = alloc,
             .name = name,
-            .use_color = stderr_is_tty,
+            .useColor = stderrIsTty,
             .file = null,
-            .log_path = null,
+            .logPath = null,
         };
     }
 
@@ -43,18 +43,18 @@ pub const Logger = struct {
         const file = try std.fs.cwd().createFile(path, .{ .read = true, .truncate = false, .exclusive = false, .mode = 0o644 });
         try file.seekFromEnd(0);
         self.file = file;
-        self.log_path = try self.alloc.dupe(u8, path);
+        self.logPath = try self.alloc.dupe(u8, path);
     }
 
     pub fn deinit(self: *Logger) void {
         if (self.file) |f| f.close();
         self.file = null;
-        if (self.log_path) |p| self.alloc.free(p);
-        self.log_path = null;
+        if (self.logPath) |p| self.alloc.free(p);
+        self.logPath = null;
     }
 
     pub fn setColor(self: *Logger, enabled: bool) void {
-        self.use_color = enabled;
+        self.useColor = enabled;
     }
 
     pub fn info(self: *Logger, comptime fmt: []const u8, args: anytype) !void {
@@ -81,17 +81,17 @@ pub const Logger = struct {
         const ts = try formatTimestamp(a);
 
         const tag = levelTag(level);
-        const tag_color = levelColor(level);
+        const tagColor = levelColor(level);
 
         const msg = try std.fmt.allocPrint(a, fmt, args);
 
         const errf = std.fs.File.stderr();
 
-        const line = try if (self.use_color)
+        const line = try if (self.useColor)
             std.fmt.allocPrint(
                 a,
                 "{s}{s}{s} {s}[{s}]{s} {s}{s}{s} {s}\n",
-                .{ Dim, ts, Reset, tag_color, tag, Reset, Cyan, self.name, Reset, msg },
+                .{ Dim, ts, Reset, tagColor, tag, Reset, Cyan, self.name, Reset, msg },
             )
         else
             std.fmt.allocPrint(a, "{s} [{s}] {s} {s}\n", .{ ts, tag, self.name, msg });
@@ -99,8 +99,8 @@ pub const Logger = struct {
         try errf.writeAll(line);
 
         if (self.file) |_| {
-            const plain_line = try std.fmt.allocPrint(a, "{s} [{s}] {s} {s}\n", .{ ts, tag, self.name, msg });
-            self.writeRaw(plain_line);
+            const plainLine = try std.fmt.allocPrint(a, "{s} [{s}] {s} {s}\n", .{ ts, tag, self.name, msg });
+            self.writeRaw(plainLine);
         }
     }
 
