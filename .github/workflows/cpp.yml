@@ -1,0 +1,33 @@
+name: C++ CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache CMake build directory
+        uses: actions/cache@v3
+        with:
+          path: |
+            src/build
+          key: ${{ runner.os }}-cmake-${{ hashFiles('src/CMakeLists.txt') }}-${{ hashFiles('src/src/**', 'src/include/**') }}
+          restore-keys: |
+            ${{ runner.os }}-cmake-
+
+      - name: Configure
+        run: cmake -S src -B src/build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build src/build --config Release

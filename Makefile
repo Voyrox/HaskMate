@@ -1,50 +1,33 @@
-ZIG ?= zig
-OPT ?= ReleaseFast
-WINDOWS_TARGET ?= x86_64-windows-gnu
+BUILD_DIR ?= src/build
+PREFIX ?= /usr/local
+CMAKE ?= cmake
+CMAKE_BUILD_TYPE ?= Release
+ARGS ?=
 
-ifeq ($(OS),Windows_NT)
-  HOST_OS := Windows
-else
-  HOST_OS := $(shell uname -s 2>/dev/null)
-endif
-
-ifeq ($(HOST_OS),Windows)
-  DEFAULT_PREFIX ?= $(LOCALAPPDATA)/Programs/zippy
-else
-  DEFAULT_PREFIX ?= /usr/local
-endif
-
-PREFIX ?= $(DEFAULT_PREFIX)
-PREFIX_FLAG = $(if $(PREFIX),-p $(PREFIX),)
-
-.PHONY: build build-linux build-windows install clean help
+.PHONY: build run install clean help
 
 build:
-	$(ZIG) build -Doptimize=$(OPT)
+	$(CMAKE) -S src -B $(BUILD_DIR) -DCMAKE_BUILD_TYPE=$(CMAKE_BUILD_TYPE)
+	$(CMAKE) --build $(BUILD_DIR)
 
-build-linux: build
+run: build
+	$(BUILD_DIR)/zippy $(ARGS)
 
-build-windows:
-	$(ZIG) build -Doptimize=$(OPT) -Dtarget=$(WINDOWS_TARGET)
-
-install:
-	$(ZIG) build -Doptimize=$(OPT) install $(PREFIX_FLAG)
-	@echo "Installed to $(PREFIX)/bin (ensure this is on PATH)."
-	@if [ "$(HOST_OS)" = "Windows" ]; then \
-	  printf "Add to PATH (PowerShell): [Environment]::SetEnvironmentVariable(\"Path\", \"%s;$(PREFIX)/bin\", \"User\")\n" "$$(powershell -NoProfile -Command "[Environment]::GetEnvironmentVariable('Path','User')")"; \
-	else \
-	  echo "Add to PATH (bash): export PATH=\"$(PREFIX)/bin:\$$PATH\""; \
-	fi
+install: build
+	install -d $(PREFIX)/bin
+	install $(BUILD_DIR)/zippy $(PREFIX)/bin/zippy
+	@echo "Installed to $(PREFIX)/bin/zippy"
+	@echo "Add to PATH (bash): export PATH=\"$(PREFIX)/bin:\$$PATH\""
 
 clean:
-	$(ZIG) build --clean
+	rm -rf $(BUILD_DIR)
 
 help:
 	@echo "Targets:"
-	@echo "  build           Build for host (Arch/Linux)"
-	@echo "  build-windows   Cross-compile for Windows (x86_64)"
-	@echo "  install         Install to host-appropriate prefix (override with PREFIX)"
-	@echo "  clean           Remove build artifacts"
+	@echo "  build           Configure and build the C++ src in src/"
+	@echo "  run             Build and run locally (set ARGS=\"./path\")"
+	@echo "  install         Install to PREFIX/bin (default: /usr/local/bin)"
+	@echo "  clean           Remove the CMake build directory"
 	@echo "  help            Show this message"
 	@echo
-	@echo "Vars: ZIG, OPT (Debug/ReleaseSafe/ReleaseFast/ReleaseSmall), WINDOWS_TARGET, PREFIX"
+	@echo "Vars: CMAKE, BUILD_DIR, CMAKE_BUILD_TYPE, PREFIX, ARGS"
