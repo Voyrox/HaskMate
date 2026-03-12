@@ -21,13 +21,13 @@ jobs:
         uses: actions/cache@v3
         with:
           path: |
-            src/build
-          key: ${{ runner.os }}-cmake-${{ hashFiles('src/CMakeLists.txt') }}-${{ hashFiles('src/src/**', 'src/include/**') }}
+            build
+          key: ${{ runner.os }}-cmake-${{ hashFiles('CMakeLists.txt') }}-${{ hashFiles('src/**', 'include/**', 'library/**') }}
           restore-keys: |
             ${{ runner.os }}-cmake-
 
       - name: Configure
-        run: cmake -S src -B src/build -DCMAKE_BUILD_TYPE=Release
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
-        run: cmake --build src/build --config Release
+        run: cmake --build build --config Release

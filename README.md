@@ -9,7 +9,7 @@ Zippy is a lightweight Linux CLI that watches a file or directory and reruns you
 make build
 
 # Run from the local build
-./src/build/zippy ./path/to/file-or-dir
+./build/zippy ./path/to/file-or-dir
 
 # Install it globally
 sudo make install
@@ -73,7 +73,7 @@ Prereqs:
 
 Commands:
 
-- `make build` configures and builds `src/`
+- `make build` configures and builds the project
 - `make run ARGS="./path"` runs the local build
 - `make install PREFIX=/path` installs `zippy` into `PREFIX/bin`
 - `make clean` removes the CMake build directory

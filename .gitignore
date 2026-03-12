@@ -24,7 +24,7 @@ test/test.o
 test/stack.yaml.lock
 test/app/test.exe
 
-src/build/
+build/
 test/Haskell/app/test.exe
 test/Haskell/app/test.hi
 test/Haskell/app/test.o
