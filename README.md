@@ -1,4 +1,4 @@
-# Zippy: A file-watching CLI for faster edit-build-run loops
+# Zippy
 
 Zippy is a lightweight Linux CLI that watches a file or directory and reruns your command the moment you save. It’s ideal for C++ development, letting you see the impact of your changes immediately without waiting for a full build.
 
