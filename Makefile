@@ -7,6 +7,7 @@ ARGS ?=
 .PHONY: build run install clean help
 
 build:
+	$(CMAKE) -DBUILD_DIR=$(BUILD_DIR) -DSOURCE_DIR=$(CURDIR) -P cmake/prepare_build.cmake
 	$(CMAKE) -S . -B $(BUILD_DIR) -DCMAKE_BUILD_TYPE=$(CMAKE_BUILD_TYPE)
 	$(CMAKE) --build $(BUILD_DIR)
 
